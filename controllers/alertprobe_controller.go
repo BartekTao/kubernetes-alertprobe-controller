@@ -99,22 +99,32 @@ func (r *AlertProbeReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				log.Info("stopping goroutine", "url", alertProbe.Spec.URL)
 				return
 			case <-ticker.C:
+				ctxHttp, cancel := context.WithTimeout(ctxProbe, 5*time.Second)
+
+				reqHttp, err := http.NewRequestWithContext(ctxHttp, http.MethodGet, alertProbe.Spec.URL, nil)
+				if err != nil {
+					log.Error(err, "Failed to create http request")
+					cancel()
+					continue
+				}
 				log.Info("checking url", "url", alertProbe.Spec.URL)
-				res, err := http.Get(alertProbe.Spec.URL)
+				resp, err := http.DefaultClient.Do(reqHttp)
 				if err != nil {
 					log.Error(err, "unable to send GET request")
-					return
+					cancel()
+					continue
 				}
-				if res.StatusCode != 200 {
+				if resp.StatusCode != 200 {
 					notify("URL check failed for " + req.NamespacedName.String())
 				}
 
 				alertProbe.Status.LastCheckTime = metav1.Now()
-				alertProbe.Status.LastCheckResult = res.Status
+				alertProbe.Status.LastCheckResult = resp.Status
 				if err := r.Status().Update(ctxProbe, &alertProbe); err != nil {
 					log.Error(err, "unable to update AlertProbe status")
 				}
-				_ = res.Body.Close()
+				_ = resp.Body.Close()
+				cancel()
 			}
 		}
 	}()
