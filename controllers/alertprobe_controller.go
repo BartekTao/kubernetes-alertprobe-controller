@@ -96,22 +96,25 @@ func (r *AlertProbeReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		for {
 			select {
 			case <-ctxProbe.Done():
+				log.Info("stopping goroutine", "url", alertProbe.Spec.URL)
 				return
 			case <-ticker.C:
+				log.Info("checking url", "url", alertProbe.Spec.URL)
 				res, err := http.Get(alertProbe.Spec.URL)
 				if err != nil {
 					log.Error(err, "unable to send GET request")
+					return
 				}
 				if res.StatusCode != 200 {
 					notify("URL check failed for " + req.NamespacedName.String())
 				}
-				defer res.Body.Close()
 
 				alertProbe.Status.LastCheckTime = metav1.Now()
 				alertProbe.Status.LastCheckResult = res.Status
-				if err := r.Status().Update(ctx, &alertProbe); err != nil {
+				if err := r.Status().Update(ctxProbe, &alertProbe); err != nil {
 					log.Error(err, "unable to update AlertProbe status")
 				}
+				_ = res.Body.Close()
 			}
 		}
 	}()
