@@ -28,14 +28,23 @@ type AlertProbeSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of AlertProbe. Edit alertprobe_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// URL to check
+	URL string `json:"url"`
+
+	// Check period in seconds
+	PeriodSeconds int32 `json:"periodSeconds"`
 }
 
 // AlertProbeStatus defines the observed state of AlertProbe
 type AlertProbeStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// The result of the last check
+	LastCheckResult string `json:"lastCheckResult"`
+
+	// The time of the last check
+	LastCheckTime metav1.Time `json:"lastCheckTime"`
 }
 
 //+kubebuilder:object:root=true
