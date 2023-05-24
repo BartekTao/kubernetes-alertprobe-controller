@@ -18,19 +18,35 @@ package controllers
 
 import (
 	"context"
+	"net/http"
+	"sync"
+	"time"
 
+	"github.com/BartekTao/kubernetes-alertprobe-controller/api/v1alpha1"
+	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	probev1alpha1 "github.com/BartekTao/kubernetes-alertprobe-controller/api/v1alpha1"
 )
 
 // AlertProbeReconciler reconciles a AlertProbe object
 type AlertProbeReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Log     logr.Logger
+	Scheme  *runtime.Scheme
+	cancels sync.Map
+}
+
+func NewAlertProbeReconciler(client client.Client, scheme *runtime.Scheme, log logr.Logger) *AlertProbeReconciler {
+	return &AlertProbeReconciler{
+		Client:  client,
+		Scheme:  scheme,
+		Log:     log,
+		cancels: sync.Map{},
+	}
 }
 
 //+kubebuilder:rbac:groups=probe.rextein.com,resources=alertprobes,verbs=get;list;watch;create;update;patch;delete
@@ -48,8 +64,57 @@ type AlertProbeReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *AlertProbeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
+	log := r.Log.WithValues("alertprobe", req.NamespacedName)
 
-	// TODO(user): your logic here
+	var alertProbe v1alpha1.AlertProbe
+	if err := r.Get(ctx, req.NamespacedName, &alertProbe); err != nil {
+		if errors.IsNotFound(err) {
+			// Cancel the goroutine if the AlertProbe was deleted
+			if cancel, exists := r.cancels.Load(req.NamespacedName.String()); exists {
+				cancel.(context.CancelFunc)()
+				r.cancels.Delete(req.NamespacedName.String())
+			}
+			return ctrl.Result{}, nil
+		}
+		// handle other errors
+		log.Error(err, "unable to fetch AlertProbe")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// Cancel the existing goroutine if one already exists for the alertProbe
+	if cancel, ok := r.cancels.Load(req.NamespacedName); ok {
+		cancel.(context.CancelFunc)()
+	}
+
+	ctxProbe, cancel := context.WithCancel(ctx)
+
+	r.cancels.Store(req.NamespacedName, cancel)
+
+	go func() {
+		ticker := time.NewTicker(time.Duration(alertProbe.Spec.PeriodSeconds) * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctxProbe.Done():
+				return
+			case <-ticker.C:
+				res, err := http.Get(alertProbe.Spec.URL)
+				if err != nil {
+					log.Error(err, "unable to send GET request")
+				}
+				if res.StatusCode != 200 {
+					notify("URL check failed for " + req.NamespacedName.String())
+				}
+				defer res.Body.Close()
+
+				alertProbe.Status.LastCheckTime = metav1.Now()
+				alertProbe.Status.LastCheckResult = res.Status
+				if err := r.Status().Update(ctx, &alertProbe); err != nil {
+					log.Error(err, "unable to update AlertProbe status")
+				}
+			}
+		}
+	}()
 
 	return ctrl.Result{}, nil
 }
@@ -57,6 +122,11 @@ func (r *AlertProbeReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 // SetupWithManager sets up the controller with the Manager.
 func (r *AlertProbeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&probev1alpha1.AlertProbe{}).
+		For(&v1alpha1.AlertProbe{}).
 		Complete(r)
+}
+
+func notify(msg string) {
+	// implement your notification logic here
+	println(msg)
 }

@@ -89,10 +89,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.AlertProbeReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	reconciler := controllers.NewAlertProbeReconciler(mgr.GetClient(), mgr.GetScheme(), ctrl.Log.WithName("controllers").WithName("AlertProbe"))
+	if err = reconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AlertProbe")
 		os.Exit(1)
 	}
