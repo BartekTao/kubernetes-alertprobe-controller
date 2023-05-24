@@ -1,0 +1,27 @@
+# permissions for end users to view alertprobes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: alertprobe-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: github
+    app.kubernetes.io/part-of: github
+    app.kubernetes.io/managed-by: kustomize
+  name: alertprobe-viewer-role
+rules:
+- apiGroups:
+  - probe.rextein.com
+  resources:
+  - alertprobes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - probe.rextein.com
+  resources:
+  - alertprobes/status
+  verbs:
+  - get

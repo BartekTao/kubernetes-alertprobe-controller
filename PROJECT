@@ -10,4 +10,14 @@ plugins:
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: github
 repo: github.com/BartekTao/kubernetes-alertprobe-controller
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: rextein.com
+  group: probe
+  kind: AlertProbe
+  path: github.com/BartekTao/kubernetes-alertprobe-controller/api/v1alpha1
+  version: v1alpha1
 version: "3"
