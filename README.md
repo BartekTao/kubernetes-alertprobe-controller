@@ -1,8 +1,23 @@
 # github
-// TODO(user): Add simple overview of use/purpose
+The Alert Probe Controller is designed to periodically perform health checks by calling a specific URL. Its purpose is to monitor the health of a service and send notifications in case of any issues. The controller does not make any modifications to the service itself.
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+### Functionality
+The Alert Probe Controller performs the following tasks:
+1. Periodically sends HTTP GET requests to a specified URL.
+2. Checks the response status code and determines the health of the service.
+3. Sends notifications if the health check fails.
+4. Does not modify or interfere with the service in any way.
+
+### Usage
+Once the Alert Probe Controller is installed, it will automatically start monitoring the services based on the AlertProbe resources created in the cluster. To use the controller, follow these steps:
+1. Create an AlertProbe resource with the desired URL and check period.
+2. The controller will start sending health check requests to the specified URL at the configured intervals.
+3. If the health check fails (non-200 response status code), the controller will send a notification.
+
+Note: The controller does not perform any remedial actions on the service itself. It is responsible only for health monitoring and notifications.
+
+-------------------------
 
 ## Getting Started
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
